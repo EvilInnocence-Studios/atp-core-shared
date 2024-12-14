@@ -1,4 +1,3 @@
-import { IncomingHttpHeaders } from "http";
 import { Index } from "ts-functional/dist/types";
 
 export type NewObj<T extends {id:number}> = Omit<T, "id">;
