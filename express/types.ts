@@ -1,6 +1,6 @@
 import { Index } from "ts-functional/dist/types";
 
-export type NewObj<T extends {id:number}> = Omit<T, "id">;
+export type NewObj<T extends {id:string}> = Omit<T, "id">;
 
 export declare type Headers = Index<string>;
 
