@@ -1,4 +1,4 @@
-import { IModule } from "@core/lib/module";
+import { IModule } from "@core-shared/module";
 
 export const module:IModule = {
     name: "core-shared",
