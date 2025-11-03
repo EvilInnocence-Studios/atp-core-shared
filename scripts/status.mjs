@@ -35,21 +35,15 @@ const rows = changedOnly
     ? repoStatuses.filter(({ unstagedChanges, changesToPush }) => unstagedChanges || changesToPush)
     : repoStatuses;
 
-// NEW: headers and "No changes" full-width row handling
-const headers = ['Module', 'Branch', 'Δ', '⇡', 'Remote URL'];
-
 const data = [
-    headers,
-    ...(changedOnly && rows.length === 0
-        ? [[{ colSpan: headers.length, content: 'No changes' }]]
-        : rows.map(({ name, unstagedChanges, changesToPush, currentBranch, remoteUrl }) => [
-            unstagedChanges ? chalk.red(name) : changesToPush ? chalk.yellow(name) : chalk.green(name),
-            chalk.blue(currentBranch),
-            unstagedChanges ? chalk.red('✕') : chalk.green('✓'),
-            changesToPush ? chalk.yellow('✕') : chalk.green('✓'),
-            chalk.blue(remoteUrl)
-        ])
-    )
+    ['Module', 'Branch', 'Δ', '⇡', 'Remote URL'],
+    ...rows.map(({ name, unstagedChanges, changesToPush, currentBranch, remoteUrl }) => [
+        unstagedChanges ? chalk.red(name) : changesToPush ? chalk.yellow(name) : chalk.green(name),
+        chalk.blue(currentBranch),
+        unstagedChanges ? chalk.red('✕') : chalk.green('✓'),
+        changesToPush ? chalk.yellow('✕') : chalk.green('✓'),
+        chalk.blue(remoteUrl)
+    ])
 ];
 
 console.log(table(data));
