@@ -29,13 +29,19 @@ const mainRepoStatus = {
 };
 repoStatuses.unshift(mainRepoStatus);
 
+// Add CLI flag parsing and filtering
+const changedOnly = process.argv.includes('--changed');
+const rows = changedOnly
+    ? repoStatuses.filter(({ unstagedChanges, changesToPush }) => unstagedChanges || changesToPush)
+    : repoStatuses;
+
 const data = [
-    ['Module', 'Branch', 'Committed?', 'Pushed?', 'Remote URL'],
-    ...repoStatuses.map(({ name, unstagedChanges, changesToPush, currentBranch, remoteUrl }) => [
+    ['Module', 'Branch', 'Δ', '⇡', 'Remote URL'],
+    ...rows.map(({ name, unstagedChanges, changesToPush, currentBranch, remoteUrl }) => [
         unstagedChanges ? chalk.red(name) : changesToPush ? chalk.yellow(name) : chalk.green(name),
         chalk.blue(currentBranch),
-        unstagedChanges ? chalk.red('    ✕') : chalk.green('    ✓'),
-        changesToPush ? chalk.yellow('   ✕') : chalk.green('   ✓'),
+        unstagedChanges ? chalk.red('✕') : chalk.green('✓'),
+        changesToPush ? chalk.yellow('✕') : chalk.green('✓'),
         chalk.blue(remoteUrl)
     ])
 ];
