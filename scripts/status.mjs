@@ -30,8 +30,8 @@ const mainRepoStatus = {
 repoStatuses.unshift(mainRepoStatus);
 
 // Add CLI flag parsing and filtering
-const changedOnly = process.argv.includes('--changed');
-const rows = changedOnly
+const showAll = process.argv.includes('--all');
+const rows = !showAll
     ? repoStatuses.filter(({ unstagedChanges, changesToPush }) => unstagedChanges || changesToPush)
     : repoStatuses;
 
