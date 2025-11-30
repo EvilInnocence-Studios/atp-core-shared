@@ -16,8 +16,8 @@ const getRepoStatus = (repoPath) => {
     const name = path.basename(repoPath);
     const statusOutput = execSync('git status --porcelain', { cwd: repoPath }).toString();
     const unstagedChanges = statusOutput.split('\n').some(line => line.startsWith(' M') || line.startsWith('??'));
-    const changesToPush = execSync('git log origin/main..HEAD', { cwd: repoPath }).toString().trim().length > 0;
     const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: repoPath }).toString().trim();
+    const changesToPush = execSync(`git log origin/${currentBranch}..HEAD`, { cwd: repoPath }).toString().trim().length > 0;
     const remoteUrl = execSync('git config --get remote.origin.url', { cwd: repoPath }).toString().trim();
     return { name, unstagedChanges, changesToPush, currentBranch, remoteUrl };
 };
