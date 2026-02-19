@@ -13,16 +13,10 @@ import {
     UpdateDistributionCommand,
 } from '@aws-sdk/client-cloudfront';
 import 'dotenv/config';
-// Add Node utils for directory scanning and dynamic import resolution
 import { fromEnv } from '@aws-sdk/credential-providers';
-let caching: any[] = [];
-try {
-    // @ts-ignore
-    const cachingModule = await import("../../caching.config.js");
-    caching = cachingModule.caching || [];
-} catch (e) {
-    // console.log("No caching.config found, using default empty caching behaviors.");
-}
+import { existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export declare interface IBehavior {
     precedence: number;
@@ -146,6 +140,36 @@ const createCloudFrontDistribution = async (): Promise<string> => {
 
     if (!s3Bucket && !originDomainName) {
         throw new Error('Missing either AWS_BUCKET or ORIGIN_DOMAIN_NAME/CF_ORIGIN_DOMAIN_NAME in environment');
+    }
+
+    // Robust Optional Caching Config Load
+    let caching: any[] = [];
+    const currentFile = fileURLToPath(import.meta.url);
+    const currentDir = dirname(currentFile);
+    const configPath = join(currentDir, "../../caching.config.ts");
+    
+    if (existsSync(configPath)) {
+        console.log(`Found caching config at: ${configPath}`);
+        try {
+            const configUrl = pathToFileURL(configPath).href;
+            const cachingModule = await import(configUrl);
+            caching = cachingModule.caching || [];
+            console.log(`Loaded ${caching.length} cache behaviors.`);
+        } catch (e: any) {
+            console.warn(`Failed to import caching config: ${e.message}`);
+        }
+    } else {
+        // Fallback check for .js if running after build (though ts-node handles .ts)
+        const configPathJs = configPath.replace('.ts', '.js');
+        if (existsSync(configPathJs)) {
+            try {
+                const configUrl = pathToFileURL(configPathJs).href;
+                const cachingModule = await import(configUrl);
+                caching = cachingModule.caching || [];
+            } catch (e: any) {
+                console.warn(`Failed to import caching config (js): ${e.message}`);
+            }
+        }
     }
 
     // Resolve required managed policy IDs
