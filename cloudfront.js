@@ -1,33 +1,22 @@
 import { ACMClient, DescribeCertificateCommand, ListCertificatesCommand } from '@aws-sdk/client-acm';
 import {
-    CacheBehavior,
     CloudFrontClient,
     CreateDistributionCommand,
-    DefaultCacheBehavior,
-    DistributionConfig,
     GetDistributionConfigCommand,
     ListCachePoliciesCommand,
     ListOriginRequestPoliciesCommand,
     ListResponseHeadersPoliciesCommand,
-    Origin,
     UpdateDistributionCommand,
 } from '@aws-sdk/client-cloudfront';
 import 'dotenv/config';
-import { fromEnv } from '@aws-sdk/credential-providers';
 import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export declare interface IBehavior {
-    precedence: number;
-    pathPattern: string;
-    cache: boolean;
-}
-
 // Helpers to resolve managed policy IDs by name (case-insensitive, ignore non-alphanumerics)
-const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-async function findManagedCachePolicyId(client: CloudFrontClient, name: string): Promise<string> {
+async function findManagedCachePolicyId(client, name) {
     const res = await client.send(new ListCachePoliciesCommand({ Type: 'managed' }));
     const target = normalize(name);
     const match = res.CachePolicyList?.Items?.find(
@@ -37,7 +26,7 @@ async function findManagedCachePolicyId(client: CloudFrontClient, name: string):
     return match;
 }
 
-async function findManagedOriginRequestPolicyId(client: CloudFrontClient, name: string): Promise<string> {
+async function findManagedOriginRequestPolicyId(client, name) {
     const res = await client.send(new ListOriginRequestPoliciesCommand({ Type: 'managed' }));
     const target = normalize(name);
     const match = res.OriginRequestPolicyList?.Items?.find(
@@ -47,7 +36,7 @@ async function findManagedOriginRequestPolicyId(client: CloudFrontClient, name: 
     return match;
 }
 
-async function findManagedResponseHeadersPolicyId(client: CloudFrontClient, name: string): Promise<string> {
+async function findManagedResponseHeadersPolicyId(client, name) {
     const res = await client.send(new ListResponseHeadersPoliciesCommand({ Type: 'managed' }));
     const target = normalize(name);
     const match = res.ResponseHeadersPolicyList?.Items?.find(
@@ -57,13 +46,13 @@ async function findManagedResponseHeadersPolicyId(client: CloudFrontClient, name
     return match;
 }
 
-async function findCertificateArnByName(certificateName: string): Promise<{ arn?: string, status?: string }> {
+async function findCertificateArnByName(certificateName) {
     if (!certificateName) return {};
 
-    const acm = new ACMClient({ region: 'us-east-1', credentials: fromEnv() });
+    const acm = new ACMClient({ region: 'us-east-1' });
     const target = certificateName.toLowerCase();
 
-    const matches = (host: string | undefined, pattern: string | undefined) => {
+    const matches = (host, pattern) => {
         if (!host || !pattern) return false;
         const h = host.toLowerCase();
         const p = pattern.toLowerCase();
@@ -76,10 +65,10 @@ async function findCertificateArnByName(certificateName: string): Promise<{ arn?
     };
 
     // Pass 1: try to match summaries by DomainName to avoid extra API calls
-    let nextToken: string | undefined = undefined;
-    const candidateArns: string[] = [];
+    let nextToken = undefined;
+    const candidateArns = [];
     do {
-        const res:any = await acm.send(new ListCertificatesCommand({ NextToken: nextToken }));
+        const res = await acm.send(new ListCertificatesCommand({ NextToken: nextToken }));
         for (const s of res.CertificateSummaryList ?? []) {
             const arn = s.CertificateArn;
             const domain = s.DomainName;
@@ -99,7 +88,7 @@ async function findCertificateArnByName(certificateName: string): Promise<{ arn?
             const cert = res.Certificate;
             if (!cert) continue;
 
-            const names = new Set<string>();
+            const names = new Set();
             if (cert.DomainName) names.add(cert.DomainName);
             for (const san of cert.SubjectAlternativeNames ?? []) {
                 if (san) names.add(san);
@@ -124,10 +113,10 @@ async function findCertificateArnByName(certificateName: string): Promise<{ arn?
     return {};
 }
 
-const createCloudFrontDistribution = async (): Promise<string> => {
-    const cloudFront = new CloudFrontClient({ region: 'us-east-1', credentials: fromEnv() });
+const createCloudFrontDistribution = async () => {
+    const cloudFront = new CloudFrontClient({ region: 'us-east-1' });
 
-    const getEnv = (k: string) => process.env[k]?.trim() || undefined;
+    const getEnv = (k) => process.env[k]?.trim() || undefined;
     const alternateDomainNames =
         getEnv('ALTERNATE_DOMAIN_NAMES')
             ?.split(',')
@@ -143,7 +132,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
     }
 
     // Robust Optional Caching Config Load
-    let caching: any[] = [];
+    let caching = [];
     const currentFile = fileURLToPath(import.meta.url);
     const currentDir = dirname(currentFile);
     const configPath = join(currentDir, "../../caching.config.ts");
@@ -155,7 +144,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
             const cachingModule = await import(configUrl);
             caching = cachingModule.caching || [];
             console.log(`Loaded ${caching.length} cache behaviors.`);
-        } catch (e: any) {
+        } catch (e) {
             console.warn(`Failed to import caching config: ${e.message}`);
         }
     } else {
@@ -166,7 +155,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
                 const configUrl = pathToFileURL(configPathJs).href;
                 const cachingModule = await import(configUrl);
                 caching = cachingModule.caching || [];
-            } catch (e: any) {
+            } catch (e) {
                 console.warn(`Failed to import caching config (js): ${e.message}`);
             }
         }
@@ -187,7 +176,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
         findManagedCachePolicyId(cloudFront, 'Managed-CachingOptimized'),
     ]);
 
-    const origins: Origin[] = [];
+    const origins = [];
     if (s3Bucket) {
         console.log(`Configuring S3 origin for bucket: ${s3Bucket}`);
         origins.push({
@@ -201,7 +190,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
         console.log(`Configuring Lambda origin: ${originDomainName}`);
         origins.push({
             Id: 'LambdaOrigin',
-            DomainName: originDomainName!,
+            DomainName: originDomainName,
             CustomOriginConfig: {
                 OriginProtocolPolicy: 'https-only',
                 HTTPPort: 80,
@@ -210,7 +199,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
         });
     }
 
-    const defaultCacheBehavior: DefaultCacheBehavior = {
+    const defaultCacheBehavior = {
         TargetOriginId: s3Bucket ? 'S3Origin' : 'LambdaOrigin',
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
@@ -226,7 +215,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
         ResponseHeadersPolicyId: responseHeadersPolicyId,
     };
 
-    const cacheBehaviors: CacheBehavior[] = (caching).map(behavior => ({
+    const cacheBehaviors = (caching).map(behavior => ({
         PathPattern: behavior.pathPattern,
         TargetOriginId: s3Bucket ? 'S3Origin' : 'LambdaOrigin',
         ViewerProtocolPolicy: 'redirect-to-https',
@@ -243,7 +232,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
         OriginRequestPolicyId: originRequestAllExceptHostId,
     }));
 
-    const distributionConfig: DistributionConfig = {
+    const distributionConfig = {
         CallerReference: distributionId ? undefined : `${Date.now()}`,
         Origins: {
             Quantity: origins.length,
@@ -260,7 +249,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
     };
 
     // Resolve ACM certificate logic
-    let certInfo: { arn?: string; status?: string } = { arn: undefined, status: undefined };
+    let certInfo = { arn: undefined, status: undefined };
     if (certificateName) {
         certInfo = await findCertificateArnByName(certificateName);
     }
