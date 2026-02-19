@@ -15,7 +15,14 @@ import {
 import 'dotenv/config';
 // Add Node utils for directory scanning and dynamic import resolution
 import { fromEnv } from '@aws-sdk/credential-providers';
-import { caching } from "../../caching.config";
+let caching: any[] = [];
+try {
+    // @ts-ignore
+    const cachingModule = await import("../../caching.config.js");
+    caching = cachingModule.caching || [];
+} catch (e) {
+    // console.log("No caching.config found, using default empty caching behaviors.");
+}
 
 export declare interface IBehavior {
     precedence: number;
