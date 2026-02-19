@@ -127,12 +127,6 @@ const createCloudFrontDistribution = async (): Promise<string> => {
     const cloudFront = new CloudFrontClient({ region: 'us-east-1', credentials: fromEnv() });
 
     const getEnv = (k: string) => process.env[k]?.trim() || undefined;
-    const originDomainName =
-        getEnv('ORIGIN_DOMAIN_NAME') ||
-        getEnv('CF_ORIGIN_DOMAIN_NAME');
-    if (!originDomainName) {
-        throw new Error('Missing ORIGIN_DOMAIN_NAME in environment');
-    }
     const alternateDomainNames =
         getEnv('ALTERNATE_DOMAIN_NAMES')
             ?.split(',')
@@ -140,6 +134,12 @@ const createCloudFrontDistribution = async (): Promise<string> => {
             .filter(Boolean) ?? [];
     const certificateName = getEnv('CERTIFICATE_NAME');
     const distributionId = getEnv('CLOUDFRONT_DISTRIBUTION_ID');
+    const s3Bucket = getEnv('AWS_BUCKET');
+    const originDomainName = getEnv('ORIGIN_DOMAIN_NAME') || getEnv('CF_ORIGIN_DOMAIN_NAME');
+
+    if (!s3Bucket && !originDomainName) {
+        throw new Error('Missing either AWS_BUCKET or ORIGIN_DOMAIN_NAME/CF_ORIGIN_DOMAIN_NAME in environment');
+    }
 
     // Resolve required managed policy IDs
     const [
@@ -156,20 +156,31 @@ const createCloudFrontDistribution = async (): Promise<string> => {
         findManagedCachePolicyId(cloudFront, 'Managed-CachingOptimized'),
     ]);
 
-    const origins: Origin[] = [
-        {
+    const origins: Origin[] = [];
+    if (s3Bucket) {
+        console.log(`Configuring S3 origin for bucket: ${s3Bucket}`);
+        origins.push({
+            Id: 'S3Origin',
+            DomainName: `${s3Bucket}.s3.amazonaws.com`,
+            S3OriginConfig: {
+                OriginAccessIdentity: '' // Public bucket or using OAC (handled separately if needed)
+            }
+        });
+    } else {
+        console.log(`Configuring Lambda origin: ${originDomainName}`);
+        origins.push({
             Id: 'LambdaOrigin',
-            DomainName: originDomainName,
+            DomainName: originDomainName!,
             CustomOriginConfig: {
                 OriginProtocolPolicy: 'https-only',
                 HTTPPort: 80,
                 HTTPSPort: 443,
             },
-        },
-    ];
+        });
+    }
 
     const defaultCacheBehavior: DefaultCacheBehavior = {
-        TargetOriginId: 'LambdaOrigin',
+        TargetOriginId: s3Bucket ? 'S3Origin' : 'LambdaOrigin',
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
             Quantity: 2,
@@ -186,7 +197,7 @@ const createCloudFrontDistribution = async (): Promise<string> => {
 
     const cacheBehaviors: CacheBehavior[] = (caching).map(behavior => ({
         PathPattern: behavior.pathPattern,
-        TargetOriginId: 'LambdaOrigin',
+        TargetOriginId: s3Bucket ? 'S3Origin' : 'LambdaOrigin',
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
             Quantity: 3,
@@ -213,7 +224,8 @@ const createCloudFrontDistribution = async (): Promise<string> => {
             Items: cacheBehaviors,
         },
         Enabled: true,
-        Comment: 'Created by createCloudFrontDistribution function',
+        Comment: `Created by createCloudFrontDistribution function for ${s3Bucket ? 'S3' : 'Lambda'}`,
+        DefaultRootObject: s3Bucket ? 'index.html' : undefined
     };
 
     // Resolve ACM certificate logic
