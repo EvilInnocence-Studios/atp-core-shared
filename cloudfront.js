@@ -135,7 +135,7 @@ const createCloudFrontDistribution = async () => {
     let caching = [];
     const currentFile = fileURLToPath(import.meta.url);
     const currentDir = dirname(currentFile);
-    const configPath = join(currentDir, "../../caching.config.ts");
+    const configPath = join(currentDir, "../../caching.config.js");
     
     if (existsSync(configPath)) {
         console.log(`Found caching config at: ${configPath}`);
