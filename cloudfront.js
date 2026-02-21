@@ -135,31 +135,29 @@ const createCloudFrontDistribution = async () => {
     let caching = [];
     const currentFile = fileURLToPath(import.meta.url);
     const currentDir = dirname(currentFile);
-    const configPath = join(currentDir, "../../caching.config.js");
+    const configPathJs = join(currentDir, "../../caching.config.js"); // Explicitly define JS path
+
+    console.log(`[DEBUG] Checking for caching config...`);
+    console.log(`[DEBUG] JS Path: ${configPathJs}`);
     
-    if (existsSync(configPath)) {
-        console.log(`Found caching config at: ${configPath}`);
+    // 1. Try JS Config
+    if (existsSync(configPathJs)) {
+        console.log(`[DEBUG] Found caching.config.js`);
         try {
-            const configUrl = pathToFileURL(configPath).href;
+            const configUrl = pathToFileURL(configPathJs).href;
+            console.log(`[DEBUG] Attempting to import: ${configUrl}`);
             const cachingModule = await import(configUrl);
             caching = cachingModule.caching || [];
-            console.log(`Loaded ${caching.length} cache behaviors.`);
+            console.log(`[DEBUG] Successfully loaded ${caching.length} cache behaviors from JS config.`);
         } catch (e) {
-            console.warn(`Failed to import caching config: ${e.message}`);
+            console.warn(`[DEBUG] Failed to import caching.config.js: ${e.message}`);
+            console.warn(`[DEBUG] Stack: ${e.stack}`);
         }
     } else {
-        // Fallback check for .js if running after build (though ts-node handles .ts)
-        const configPathJs = configPath.replace('.ts', '.js');
-        if (existsSync(configPathJs)) {
-            try {
-                const configUrl = pathToFileURL(configPathJs).href;
-                const cachingModule = await import(configUrl);
-                caching = cachingModule.caching || [];
-            } catch (e) {
-                console.warn(`Failed to import caching config (js): ${e.message}`);
-            }
-        }
+        console.log(`[DEBUG] caching.config.js not found.`);
     }
+
+    console.log(`[DEBUG] Final cache behaviors count: ${caching.length}`);
 
     // Resolve required managed policy IDs
     const [
@@ -204,10 +202,10 @@ const createCloudFrontDistribution = async () => {
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
             Quantity: 2,
-            Items: ['GET', 'HEAD'],
+            Items: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'PATCH', 'DELETE'],
             CachedMethods: {
                 Quantity: 2,
-                Items: ['GET', 'HEAD'],
+                Items: ['GET', 'HEAD', 'OPTIONS'],
             },
         },
         CachePolicyId: cachePolicyDisabledId,
@@ -221,7 +219,7 @@ const createCloudFrontDistribution = async () => {
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
             Quantity: 3,
-            Items: ['GET', 'HEAD', 'OPTIONS'],
+            Items: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'PATCH', 'DELETE'],
             CachedMethods: {
                 Quantity: 3,
                 Items: ['GET', 'HEAD', 'OPTIONS'],
