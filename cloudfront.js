@@ -245,7 +245,24 @@ const createCloudFrontDistribution = async () => {
         },
         Enabled: true,
         Comment: `Created by createCloudFrontDistribution function for ${s3Bucket ? 'S3' : 'Lambda'}`,
-        DefaultRootObject: s3Bucket ? 'index.html' : undefined
+        DefaultRootObject: s3Bucket ? 'index.html' : undefined,
+        CustomErrorResponses: {
+            Quantity: 2,
+            Items: [
+                {
+                    ErrorCode: 403,
+                    ResponsePagePath: '/index.html',
+                    ResponseCode: '200',
+                    ErrorCachingMinTTL: 10
+                },
+                {
+                    ErrorCode: 404,
+                    ResponsePagePath: '/index.html',
+                    ResponseCode: '200',
+                    ErrorCachingMinTTL: 10
+                }
+            ]
+        },
     };
 
     // Resolve ACM certificate logic
