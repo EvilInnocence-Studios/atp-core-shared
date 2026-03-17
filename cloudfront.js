@@ -204,7 +204,7 @@ const createCloudFrontDistribution = async () => {
             Quantity: 7,
             Items: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'PATCH', 'DELETE'],
             CachedMethods: {
-                Quantity: 2,
+                Quantity: 3,
                 Items: ['GET', 'HEAD', 'OPTIONS'],
             },
         },
