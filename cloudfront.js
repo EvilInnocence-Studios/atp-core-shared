@@ -7,6 +7,7 @@ import {
     ListOriginRequestPoliciesCommand,
     ListResponseHeadersPoliciesCommand,
     UpdateDistributionCommand,
+    CreateCachePolicyCommand,
 } from '@aws-sdk/client-cloudfront';
 import 'dotenv/config';
 import { existsSync } from 'node:fs';
@@ -44,6 +45,33 @@ async function findManagedResponseHeadersPolicyId(client, name) {
     )?.ResponseHeadersPolicy?.Id;
     if (!match) throw new Error(`Managed response headers policy not found: ${name}`);
     return match;
+}
+
+async function getOrCreateCustomCachePolicyId(client, policyName) {
+    const res = await client.send(new ListCachePoliciesCommand({ Type: 'custom' }));
+    const match = res.CachePolicyList?.Items?.find(
+        i => i.CachePolicy?.CachePolicyConfig?.Name === policyName
+    )?.CachePolicy?.Id;
+    if (match) return match;
+
+    console.log(`Creating custom cache policy: ${policyName}`);
+    const createRes = await client.send(new CreateCachePolicyCommand({
+        CachePolicyConfig: {
+            Name: policyName,
+            Comment: 'Custom cache policy with query strings',
+            MinTTL: 1,
+            MaxTTL: 31536000,
+            DefaultTTL: 86400,
+            ParametersInCacheKeyAndForwardedToOrigin: {
+                EnableAcceptEncodingGzip: true,
+                EnableAcceptEncodingBrotli: true,
+                CookiesConfig: { CookieBehavior: 'none' },
+                HeadersConfig: { HeaderBehavior: 'none' },
+                QueryStringsConfig: { QueryStringBehavior: 'all' }
+            }
+        }
+    }));
+    return createRes.CachePolicy.Id;
 }
 
 async function findCertificateArnByName(certificateName) {
@@ -159,7 +187,7 @@ const createCloudFrontDistribution = async () => {
 
     console.log(`[DEBUG] Final cache behaviors count: ${caching.length}`);
 
-    // Resolve required managed policy IDs
+    // Resolve required configured policy IDs
     const [
         responseHeadersPolicyId,
         cachePolicyDisabledId,
@@ -171,7 +199,7 @@ const createCloudFrontDistribution = async () => {
         findManagedCachePolicyId(cloudFront, 'Managed-CachingDisabled'),
         findManagedOriginRequestPolicyId(cloudFront, 'Managed-AllViewerExceptHostHeader'),
         // Used for cached endpoints
-        findManagedCachePolicyId(cloudFront, 'Managed-CachingOptimized'),
+        getOrCreateCustomCachePolicyId(cloudFront, 'CacheWithQueryStrings'),
     ]);
 
     const origins = [];
