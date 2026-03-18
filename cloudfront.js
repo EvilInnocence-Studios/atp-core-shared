@@ -229,10 +229,10 @@ const createCloudFrontDistribution = async () => {
         TargetOriginId: s3Bucket ? 'S3Origin' : 'LambdaOrigin',
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
-            Quantity: 2,
+            Quantity: 7,
             Items: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'PATCH', 'DELETE'],
             CachedMethods: {
-                Quantity: 2,
+                Quantity: 3,
                 Items: ['GET', 'HEAD', 'OPTIONS'],
             },
         },
@@ -246,7 +246,7 @@ const createCloudFrontDistribution = async () => {
         TargetOriginId: s3Bucket ? 'S3Origin' : 'LambdaOrigin',
         ViewerProtocolPolicy: 'redirect-to-https',
         AllowedMethods: {
-            Quantity: 3,
+            Quantity: 7,
             Items: ['GET', 'HEAD', 'OPTIONS', 'PUT', 'POST', 'PATCH', 'DELETE'],
             CachedMethods: {
                 Quantity: 3,
