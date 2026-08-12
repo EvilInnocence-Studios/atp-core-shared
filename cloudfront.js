@@ -146,7 +146,7 @@ const createCloudFrontDistribution = async () => {
 
     const getEnv = (k) => process.env[k]?.trim() || undefined;
     const alternateDomainNames =
-        getEnv('ALTERNATE_DOMAIN_NAMES')
+        (getEnv('ALTERNATE_DOMAIN_NAMES') || getEnv('ALTERNATE_DOMAIN_NAME'))
             ?.split(',')
             .map(s => s.trim())
             .filter(Boolean) ?? [];
@@ -167,7 +167,7 @@ const createCloudFrontDistribution = async () => {
 
     console.log(`[DEBUG] Checking for caching config...`);
     console.log(`[DEBUG] JS Path: ${configPathJs}`);
-    
+
     // 1. Try JS Config
     if (existsSync(configPathJs)) {
         console.log(`[DEBUG] Found caching.config.js`);
@@ -330,7 +330,7 @@ const createCloudFrontDistribution = async () => {
     if (distributionId) {
         console.log(`Updating existing distribution: ${distributionId}`);
         const { DistributionConfig, ETag } = await cloudFront.send(new GetDistributionConfigCommand({ Id: distributionId }));
-        
+
         // Merge configs: update only the fields we care about
         const updateParams = {
             Id: distributionId,
